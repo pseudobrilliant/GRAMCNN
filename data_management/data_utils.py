@@ -1,11 +1,43 @@
 import gzip
 import logging
+import requests
 from gzip import GzipFile
-from io import BytesIO
+from urllib.request import urlopen
 import shutil
 import os.path
-import pandas as pd
 import pickle
+import urllib
+import zipfile
+from io import BytesIO
+
+
+def fetch_url(url, dest):
+
+    print("Requesting ... " + url)
+
+    path_split = url.split('/')
+
+    path = dest + path_split[-1]
+
+    response = requests.get(url, stream=True)
+    with open(path, 'wb') as f:
+        for chunk in response.iter_content(chunk_size=1024):
+            if chunk:
+                f.write(chunk)
+
+    return path
+
+
+def fetch_unpack_zip(url, dest):
+    print("Requesting ... " + url)
+
+    response = urllib.request.urlopen(url)
+    compressed_file = BytesIO(response.read())
+    zip_file = zipfile.ZipFile(compressed_file)
+    zip_file.extractall(dest)
+
+    print("Fetched ... " + url)
+
 
 def get_zipped_pkl_data(gzip_path):
     """Retrieves data from uncompressed pickle file"""
@@ -28,7 +60,9 @@ def get_zipped_pkl_data(gzip_path):
             logging.error("Unable to unzip and read " + gzip_path + " \nWith error " + str(e))
             exit(1)
 
-    data = pd.read_pickle(pkl_path)
+    file = open(pkl_path, 'rb')
+    data = pickle.load(file)
+    file.close()
 
     os.remove(pkl_path)
 

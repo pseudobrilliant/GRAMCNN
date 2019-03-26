@@ -3,6 +3,7 @@ import data_management.nlp_utils as nlp_utils
 import data_management.data_utils as data_utils
 import re
 
+
 def clean(data):
 
     strip = re.sub('<category=.*?>', '', data)
@@ -36,15 +37,15 @@ def get_categories(content, categories):
 
 def get_tokenized(sentences):
 
-    tokenized = []
-
+    post = []
+    wordt = []
     for sentence in sentences:
         words = nlp_utils.sentence_cleanup(sentence)
         tokenized_pos = nlp_utils.pos_tag(words)
-        tokenized.append(tokenized_pos)
+        post.append(tokenized_pos)
+        wordt.append(words)
 
-    return tokenized
-
+    return wordt, post
 
 
 def get_sentences(content):
@@ -66,6 +67,40 @@ def get_lines(content_path):
         return f.readlines()
 
 
+def parse_dataset(content, save):
+
+    print("Parsing file at " + content)
+
+    lines = get_lines(content)
+
+    if lines[0] == '\n':
+        lines.pop(0)
+
+    excerpts = []
+    categories = dict()
+    tokenized_words = []
+    tokenized_pos = []
+
+    while lines:
+        sentences = get_sentences(lines)
+
+        get_categories(lines, categories)
+
+        (twords, tpos) = get_tokenized(sentences)
+
+        tokenized_words.append(twords)
+
+        tokenized_pos.append(tpos)
+
+        excerpts.append(sentences)
+
+    processed_data = {"excepts": excerpts, "categories": categories, "words": tokenized_words, "pos": tokenized_pos}
+
+    data_utils.zip_pkl_data(processed_data, save)
+
+    print("Completed Parsing\n")
+
+
 def main():
 
     parser = argparse.ArgumentParser()
@@ -74,28 +109,7 @@ def main():
     parser.add_argument("--save", "-s", help="Save tokenized as", required=True)
     args = parser.parse_args()
 
-    lines = get_lines(args.content)
-
-    if lines[0] == '\n':
-        lines.pop(0)
-
-    excerpts = []
-    categories = dict()
-    tokenized = []
-
-    while lines:
-
-        sentences = get_sentences(lines)
-
-        get_categories(lines, categories)
-
-        tokenized.append(get_tokenized(sentences))
-
-        excerpts.append(sentences)
-
-    processed_data = {"excepts": excerpts, "categories": categories, "tokenized": tokenized}
-
-    data_utils.zip_pkl_data(processed_data, args.save)
+    parse_dataset(args.content, args.save)
 
 if __name__ == "__main__":
     main()
