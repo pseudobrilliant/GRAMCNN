@@ -1,76 +1,54 @@
-import gzip
-import logging
-import requests
-from gzip import GzipFile
-from urllib.request import urlopen
-import shutil
-import os.path
-import pickle
-import urllib
-import zipfile
-from io import BytesIO
+def pad_sentences(data):
+    max_len = 0
+
+    for sentence in data:
+        size = len(sentence)
+        max_len = max(size, max_len)
+
+    for i in range(len(data)):
+        sent_len = len(data[i])
+
+        if sent_len < max_len:
+            data[i] += ['<None>' for i in range(max_len - sent_len)]
+
+    return max_len
 
 
-def fetch_url(url, dest):
+def get_padded_chars(data):
 
-    print("Requesting ... " + url)
+    unique_chars = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ',', ';', '.', '!', '.', '?', ':', '\'', '\"',
+                    '/', '\\', '|', '_', '@', '#', '$', '%', '^', '&', '*', '~']
 
-    path_split = url.split('/')
+    char_dict = dict()
 
-    path = dest + path_split[-1]
+    max_word_len = 7
 
-    response = requests.get(url, stream=True)
-    with open(path, 'wb') as f:
-        for chunk in response.iter_content(chunk_size=1024):
-            if chunk:
-                f.write(chunk)
+    padded_char_sentences = []
 
-    return path
+    for sentence in data:
+        for word in sentence:
+            if word != '<None>':
+                size = len(word)
+                max_word_len = max(size, max_word_len)
+                for char in word:
+                    if char not in unique_chars:
+                        unique_chars.append(char)
 
+    unique_chars.sort()
+    for i, char in enumerate(unique_chars):
+        char_dict[char] = i + 1
 
-def fetch_unpack_zip(url, dest):
-    print("Requesting ... " + url)
+    for sentence in data:
+        padded_char_sentence = []
+        for word in sentence:
+            if word == '<None>':
+                padded_char_sentence.append([0 for i in range(max_word_len)])
+            else:
+                size = len(word)
+                chars = [char_dict[c] for c in word]
+                chars += [0 for i in range(max_word_len - size)]
+                padded_char_sentence.append(chars)
 
-    response = urllib.request.urlopen(url)
-    compressed_file = BytesIO(response.read())
-    zip_file = zipfile.ZipFile(compressed_file)
-    zip_file.extractall(dest)
+        padded_char_sentences.append(padded_char_sentence)
 
-    print("Fetched ... " + url)
-
-
-def get_zipped_pkl_data(gzip_path):
-    """Retrieves data from uncompressed pickle file"""
-
-    pkl_path = gzip_path.replace('.gz','')
-
-    # If the pickle file is not available pull it from the compressed gzip file in data folder
-    if not os.path.isfile(pkl_path):
-        try:
-
-            # Opens gzip file at data path and attempts to decompress into pickle file
-            with open(gzip_path, 'rb') as zipf:
-                compressed_file = BytesIO(zipf.read())
-                decompressed_file = GzipFile(fileobj=compressed_file)
-
-                with open(pkl_path, 'wb') as pkl:
-                    shutil.copyfileobj(decompressed_file, pkl)
-
-        except Exception as e:
-            logging.error("Unable to unzip and read " + gzip_path + " \nWith error " + str(e))
-            exit(1)
-
-    file = open(pkl_path, 'rb')
-    data = pickle.load(file)
-    file.close()
-
-    os.remove(pkl_path)
-
-    return data
-
-
-def zip_pkl_data(data, gzip_path):
-
-    with gzip.GzipFile(gzip_path, 'wb') as zipf:
-
-        zipf.write(pickle.dumps(data, 1))
+    return padded_char_sentences, max_word_len, char_dict

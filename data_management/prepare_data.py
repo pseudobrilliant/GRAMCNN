@@ -1,4 +1,4 @@
-from data_management import data_utils, parse_dataset
+from data_management import file_utils, parse_dataset
 import os
 
 
@@ -7,9 +7,9 @@ def fetch_nzbi(dest):
     print('\nFetching: NCBI training and test set')
 
     training_ncbi = 'https://www.ncbi.nlm.nih.gov/CBBresearch/Dogan/DISEASE/NCBItrainset_corpus.zip'
-    data_utils.fetch_unpack_zip(training_ncbi, dest)
+    file_utils.fetch_unpack_zip(training_ncbi, dest)
     test_ncbi = 'https://www.ncbi.nlm.nih.gov/CBBresearch/Dogan/DISEASE/NCBItestset_corpus.zip'
-    data_utils.fetch_unpack_zip(test_ncbi, dest)
+    file_utils.fetch_unpack_zip(test_ncbi, dest)
 
     print('NCBI fetch complete\n')
 
@@ -21,7 +21,7 @@ def fetch_pre_w2v(dest):
 
     pretrained_wv = "http://evexdb.org/pmresources/vec-space-models/wikipedia-pubmed-and-PMC-w2v.bin"
 
-    data_utils.fetch_url(pretrained_wv, dest)
+    file_utils.fetch_url(pretrained_wv, dest)
 
     print('Pre-trained word2vec retrieved')
 

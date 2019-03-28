@@ -1,6 +1,5 @@
 import argparse
-import data_management.nlp_utils as nlp_utils
-import data_management.data_utils as data_utils
+from data_management import nlp_utils, file_utils, data_utils
 import re
 
 
@@ -41,6 +40,10 @@ def get_tokenized(sentences):
     wordt = []
     for sentence in sentences:
         words = nlp_utils.sentence_cleanup(sentence)
+
+        if len(words) == 0:
+            continue
+
         tokenized_pos = nlp_utils.pos_tag(words)
         post.append(tokenized_pos)
         wordt.append(words)
@@ -76,7 +79,7 @@ def parse_dataset(content, save):
     if lines[0] == '\n':
         lines.pop(0)
 
-    excerpts = []
+    total_sentences = []
     categories = dict()
     tokenized_words = []
     tokenized_pos = []
@@ -88,15 +91,21 @@ def parse_dataset(content, save):
 
         (twords, tpos) = get_tokenized(sentences)
 
-        tokenized_words.append(twords)
+        tokenized_words += twords
 
-        tokenized_pos.append(tpos)
+        tokenized_pos += tpos
 
-        excerpts.append(sentences)
+        total_sentences += sentences
 
-    processed_data = {"excepts": excerpts, "categories": categories, "words": tokenized_words, "pos": tokenized_pos}
+    max_sent_length = data_utils.pad_sentences(tokenized_words)
 
-    data_utils.zip_pkl_data(processed_data, save)
+    char, max_word_length, char_dict = data_utils.get_padded_chars(tokenized_words)
+
+    processed_data = {"excepts": total_sentences, "categories": categories, "words": tokenized_words,
+                      "char": char, "char_dict": char_dict, "pos": tokenized_pos, 'max_sent': max_sent_length,
+                      'max_word': max_word_length}
+
+    file_utils.zip_pkl_data(processed_data, save)
 
     print("Completed Parsing\n")
 
