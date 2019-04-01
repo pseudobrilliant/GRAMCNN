@@ -1,15 +1,15 @@
-def pad_sentences(data):
+def padding(data, fill):
     max_len = 0
 
-    for sentence in data:
-        size = len(sentence)
+    for block in data:
+        size = len(block)
         max_len = max(size, max_len)
 
     for i in range(len(data)):
         sent_len = len(data[i])
 
         if sent_len < max_len:
-            data[i] += ['<None>' for i in range(max_len - sent_len)]
+            data[i] += [fill for i in range(max_len - sent_len)]
 
     return max_len
 

@@ -1,10 +1,12 @@
 import string
-from nltk import pos_tag
+from nltk import pos_tag, ne_chunk, tree2conlltags
 from nltk.tokenize import word_tokenize, sent_tokenize
 import nltk
 
 nltk.download('punkt')
 nltk.download('averaged_perceptron_tagger')
+nltk.download('maxent_ne_chunker')
+nltk.download('words')
 
 def sentence_cleanup(sentence):
 
@@ -29,6 +31,6 @@ def sentence_cleanup(sentence):
 
     words = [word for word in stripped if word.isalpha()]
 
-    words = [w for w in words if not w in stop_words]
+    #words = [w for w in words if not w in stop_words]
 
     return words
