@@ -1,9 +1,11 @@
-def padding(data, fill):
-    max_len = 0
+def padding(data, fill, max=None):
+    max_len = max
 
-    for block in data:
-        size = len(block)
-        max_len = max(size, max_len)
+    if not max:
+        max_len = 0
+        for block in data:
+            size = len(block)
+            max_len = max(size, max_len)
 
     for i in range(len(data)):
         sent_len = len(data[i])
@@ -14,22 +16,26 @@ def padding(data, fill):
     return max_len
 
 
-def get_padded_chars(data):
+def get_padded_chars(data, max=None):
 
     unique_chars = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ',', ';', '.', '!', '.', '?', ':', '\'', '\"',
                     '/', '\\', '|', '_', '@', '#', '$', '%', '^', '&', '*', '~']
 
     char_dict = dict()
 
-    max_word_len = 7
+    if max:
+        max_word_len = max
+    else:
+        max_word_len = 0
 
     padded_char_sentences = []
 
     for sentence in data:
         for word in sentence:
             if word != '<None>':
-                size = len(word)
-                max_word_len = max(size, max_word_len)
+                if not max:
+                    size = len(word)
+                    max_word_len = max(size, max_word_len)
                 for char in word:
                     if char not in unique_chars:
                         unique_chars.append(char)

@@ -31,9 +31,8 @@ def get_categories(content, tags, categories):
         values = line.split('\t')
         name = values[3]
 
-        if 'B-' + name not in tags:
-            tags['B-' + name] = tag_count
-            tags['I-' + name] = tag_count + 1
+        if name not in tags:
+            tags[name] = tag_count
 
             tag_count += 2
 
@@ -114,9 +113,9 @@ def get_iob_tags(sentences, categories):
                         if i == 0:
                             if sent_iob[cat_group[i]] != 'O':
                                 continue
-                            sent_iob[cat_group[i]] = 'B-' + cat
+                            sent_iob[cat_group[i]] = cat
                         else:
-                            sent_iob[cat_group[i]] = 'I-' + cat
+                            sent_iob[cat_group[i]] = cat
 
         total_iob.append(sent_iob)
 
@@ -173,13 +172,13 @@ def parse_dataset(content, save):
 
         total_sentences += sentences
 
-    max_sent_length = data_utils.padding(tokenized_words, '<None>')
+    max_sent_length = data_utils.padding(tokenized_words, '<None>', 104)
 
-    data_utils.padding(tokenized_tags, 'O')
+    data_utils.padding(tokenized_tags, 'O', 104)
 
-    data_utils.padding(tokenized_pos, ('<None>', ''))
+    data_utils.padding(tokenized_pos, ('<None>', ''), 104)
 
-    char, max_word_length, char_dict = data_utils.get_padded_chars(tokenized_words)
+    char, max_word_length, char_dict = data_utils.get_padded_chars(tokenized_words, 42)
 
     enc_tags = get_enc_tags(tokenized_tags, tags)
 

@@ -15,19 +15,17 @@ def get_word2vec(path):
     return model
 
 
-def get_features(model, data):
-    print(model.vector_size)
+def get_features(w2i, data):
     print("Converting Features")
-
     features = []
 
     for sentence in data:
         sentence_feature = []
         for word in sentence:
-            if word == '<None>' or word not in model:
-                sentence_feature.append(np.array([0.0 for i in range(model.vector_size)]))
+            if word == '<None>' or word not in w2i:
+                sentence_feature.append(0)
             else:
-                sentence_feature.append(model[word])
+                sentence_feature.append(w2i[word])
         features.append(sentence_feature)
 
     print("Features Converted\n")
@@ -45,9 +43,17 @@ def main():
 
     training_data = file_utils.get_zipped_pkl_data(training_path)['words']
 
+    print('Loading Model')
+
     model = get_word2vec(wv_path)
 
-    features = get_features(model, training_data)
+    print(model.vector_size)
+
+    print(model.index2word[0])
+
+    w2i = {w: w_index for w_index, w in enumerate(model.index2word)}
+
+    features = get_features(w2i, training_data)
 
     file_utils.zip_pkl_data(features, '../data/NCBI_train_wv.pkl.gz')
 
@@ -60,6 +66,7 @@ def main():
 
     file_utils.zip_pkl_data(features, '../data/NCBI_test_wv.pkl.gz')
 
+    file_utils.zip_pkl_data(w2i, '../data/NCBI_model_meta.pkl.gz')
 
 if __name__ == "__main__":
     main()
