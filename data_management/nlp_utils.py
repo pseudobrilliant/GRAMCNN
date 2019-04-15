@@ -1,5 +1,5 @@
 import string
-from nltk import pos_tag, ne_chunk, tree2conlltags
+from nltk import pos_tag, ne_chunk, tree2conlltags, help
 from nltk.tokenize import word_tokenize, sent_tokenize
 import nltk
 

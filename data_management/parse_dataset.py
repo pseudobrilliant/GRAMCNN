@@ -1,5 +1,6 @@
 import argparse
 from data_management import nlp_utils, file_utils, data_utils
+from keras.utils import to_categorical
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 import re
 
@@ -30,21 +31,26 @@ def get_categories(content, tags, categories):
             return sent_cat
         values = line.split('\t')
         name = values[3]
+        tag = values[4]
 
-        if name not in tags:
-            tags[name] = tag_count
+        if 'B-' + tag not in tags:
+            tags['B-' + tag] = tag_count
+            tags['I-' + tag] = tag_count + 1
 
             tag_count += 2
 
-            categories.append(name)
+        if name not in categories:
+            categories[name] = tag
 
         if name not in sent_cat:
             sent_cat.append(name)
 
-def get_tokenized(sentences):
+
+def get_tokenized(sentences, pos_dic):
 
     post = []
     wordt = []
+
     for sentence in sentences:
         words = nlp_utils.sentence_cleanup(sentence)
 
@@ -52,7 +58,16 @@ def get_tokenized(sentences):
             continue
 
         tokenized_pos = nlp_utils.pos_tag(words)
-        post.append(tokenized_pos)
+
+        encoded_pos = []
+
+        for w, pos in tokenized_pos:
+            if pos not in pos_dic:
+                pos_dic[pos] = len(pos_dic) + 1
+
+            encoded_pos.append([pos_dic[pos]])
+
+        post.append(encoded_pos)
         wordt.append(words)
 
     return wordt, post
@@ -77,7 +92,7 @@ def get_lines(content_path):
         return f.readlines()
 
 
-def get_iob_tags(sentences, categories):
+def get_iob_tags(sentences, cur_categories, categories):
 
     total_iob = []
 
@@ -85,7 +100,7 @@ def get_iob_tags(sentences, categories):
 
         sent_iob = ['O' for word in sentence]
 
-        for cat in categories:
+        for cat in cur_categories:
 
             cat_split = cat.split(' ')
 
@@ -113,9 +128,9 @@ def get_iob_tags(sentences, categories):
                         if i == 0:
                             if sent_iob[cat_group[i]] != 'O':
                                 continue
-                            sent_iob[cat_group[i]] = cat
+                            sent_iob[cat_group[i]] = 'B-' + categories[cat]
                         else:
-                            sent_iob[cat_group[i]] = cat
+                            sent_iob[cat_group[i]] = 'I-' + categories[cat]
 
         total_iob.append(sent_iob)
 
@@ -141,7 +156,7 @@ def get_enc_tags(tokenized_tags, tags):
 
 
 
-def parse_dataset(content, save):
+def parse_dataset(content, save, past_run=None):
 
     print("Parsing file at " + content)
 
@@ -151,8 +166,17 @@ def parse_dataset(content, save):
         lines.pop(0)
 
     total_sentences = []
-    tags = {'O':0}
-    categories = []
+
+    tags = {'O': 0}
+
+    categories = dict()
+    pos_dict = dict()
+
+    if past_run:
+        tags = past_run['tags']
+        pos_dict = past_run['pos_dict']
+        categories = past_run['categories']
+
     tokenized_words = []
     tokenized_pos = []
     tokenized_tags = []
@@ -162,13 +186,13 @@ def parse_dataset(content, save):
 
         cur_cat = get_categories(lines, tags, categories)
 
-        (twords, tpos) = get_tokenized(sentences)
+        (twords, tpos) = get_tokenized(sentences, pos_dict)
 
         tokenized_words += twords
 
         tokenized_pos += tpos
 
-        tokenized_tags += get_iob_tags(twords, cur_cat)
+        tokenized_tags += get_iob_tags(twords, cur_cat, categories)
 
         total_sentences += sentences
 
@@ -176,15 +200,16 @@ def parse_dataset(content, save):
 
     data_utils.padding(tokenized_tags, 'O', 104)
 
-    data_utils.padding(tokenized_pos, ('<None>', ''), 104)
+    data_utils.padding(tokenized_pos, [0], 104)
 
     char, max_word_length, char_dict = data_utils.get_padded_chars(tokenized_words, 42)
 
     enc_tags = get_enc_tags(tokenized_tags, tags)
 
     processed_data = {"excepts": total_sentences, "categories": categories, 'tags': tags, "words": tokenized_words,
-                      "char": char, "char_dict": char_dict, "pos": tokenized_pos, 'tok_tags': tokenized_tags,
-                      'enc_tags': enc_tags, 'max_sent': max_sent_length, 'max_word': max_word_length}
+                      "char": char, "char_dict": char_dict, "pos_dict":pos_dict, "pos": tokenized_pos,
+                      'tok_tags': tokenized_tags, 'enc_tags': enc_tags, 'max_sent': max_sent_length,
+                      'max_word': max_word_length}
 
     file_utils.zip_pkl_data(processed_data, save)
 
@@ -197,9 +222,15 @@ def main():
 
     parser.add_argument("--content", "-c", help="File to tokenize", required=True)
     parser.add_argument("--save", "-s", help="Save tokenized as", required=True)
+    parser.add_argument("--dictionary", "-d", help="Dictionary file", required=False)
+
     args = parser.parse_args()
 
-    parse_dataset(args.content, args.save)
+    if args.dictionary:
+        data = file_utils.get_zipped_pkl_data(args.dictionary)
+        parse_dataset(args.content, args.save, data)
+    else:
+        parse_dataset(args.content, args.save)
 
 if __name__ == "__main__":
     main()

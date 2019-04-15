@@ -19,7 +19,7 @@ def fetch_pre_w2v(dest):
     print('Fetching w2v pre-trained on pubmed, PMC, and wikipedia')
     print('This file is roughly 4 Gb so this will take some time ...')
 
-    pretrained_wv = "http://evexdb.org/pmresources/vec-space-models/wikipedia-pubmed-and-PMC-w2v.bin"
+    pretrained_wv = "http://evexdb.org/pmresources/vec-space-models/PubMed-and-PMC-w2v.bin"
 
     file_utils.fetch_url(pretrained_wv, dest)
 
@@ -30,18 +30,17 @@ def main():
 
     dest = '../data/'
 
-    if os.path.exists(dest):
-        os.remove(dest)
-
-    os.mkdir(dest)
-
     fetch_nzbi(dest)
 
-    parse_dataset.parse_dataset(dest + 'NCBItrainset_corpus.txt', dest + 'NCBI_train_processed.pkl.gz')
+    train_path = dest + 'NCBI_train_processed.pkl.gz'
 
-    parse_dataset.parse_dataset(dest + 'NCBItestset_corpus.txt', dest + 'NCBI_test_processed.pkl.gz')
+    parse_dataset.parse_dataset(dest + 'NCBItrainset_corpus.txt', train_path)
 
-    fetch_pre_w2v(dest)
+    data = file_utils.get_zipped_pkl_data(train_path)
+
+    parse_dataset.parse_dataset(dest + 'NCBItestset_corpus.txt', dest + 'NCBI_test_processed.pkl.gz', data)
+
+    #fetch_pre_w2v(dest)
 
 
 if __name__ == "__main__":
