@@ -14,7 +14,7 @@ from data_management import file_utils
 
 def get_model(max_len_sentences, max_len_words, wv_size, config, tags, char_vocab=20, cnn_emb_size=10):
 
-    char_inputs = Input(shape=(max_len_sentences, max_len_words), name="char_input")
+    char_inputs = Input(shape=(max_len_sentences * max_len_words,), name="char_input")
 
     char_vec = Embedding(input_dim=char_vocab, output_dim=cnn_emb_size,)(char_inputs)
 
@@ -27,13 +27,13 @@ def get_model(max_len_sentences, max_len_words, wv_size, config, tags, char_voca
 
     embed_size = sum(config['char_filters']) + wv_size
 
-    char_vec = Reshape((max_len_sentences, max_len_words, cnn_emb_size, 1))(char_vec)
+    char_vec = Reshape((max_len_sentences * max_len_words, cnn_emb_size, 1))(char_vec)
 
     for i, f in enumerate(char_filters):
         cnn_sub = Conv2D(filters=f, kernel_size=[char_kernels[i], cnn_emb_size],
                                          padding='valid', activation='tanh')(char_vec)
-        cnn_sub = Lambda(lambda x: K.max(x, axis=2, keepdims=True))(cnn_sub)
-        cnn_sub = Reshape([max_len_sentences, f])(cnn_sub)
+        cnn_sub = Lambda(lambda x: K.max(x, axis=1, keepdims=True))(cnn_sub)
+        cnn_sub = Reshape([-1, f])(cnn_sub)
         cnn_sub = Dropout(rate=0.25)(cnn_sub)
         layers.append(cnn_sub)
 
