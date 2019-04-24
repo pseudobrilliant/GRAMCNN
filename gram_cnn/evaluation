@@ -55,13 +55,19 @@ def main():
 
     char_vocab = len(char_dict) + 1
 
-    config = {'char_kernels': [1, 3, 5, 7, 10], 'char_filters': [200, 200, 150, 150, 100],
-              'word_kernels': [1, 3, 5, 7, 10], 'word_filters': [50, 50, 50, 50, 50]}
+
+    config = {'char_kernels': [1, 3, 5], 'char_filters': [200, 200, 200],
+              'word_kernels': [1, 3, 5], 'word_filters': [50, 50, 50]}
 
     print('Building Model')
     model = gram_cnn.get_model(max_len_sentences, max_len_words, 200, config, test_tags, char_vocab)
 
-    model.load_weights('../data/saved-model-361--0.84.hdf5')
+    model.load_weights('../data/saved-model-28-0.01.hdf5')
+
+
+    from keras.utils import plot_model
+    plot_model(model, to_file='../data/model.png',  show_shapes=True, show_layer_names=True)
+
 
     pred_y = model.predict([np.array(test_chars), np.array(test_vectorized), np.array(test_pos)], batch_size=1)
 

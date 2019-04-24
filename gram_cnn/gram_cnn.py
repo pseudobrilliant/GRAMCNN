@@ -1,5 +1,5 @@
 from time import time
-from keras.layers import Embedding, Conv2D, Conv1D, TimeDistributed, Concatenate, Reshape, Lambda, Dropout
+from keras.layers import Embedding, Conv2D, Conv1D, TimeDistributed, Highway, Concatenate, Reshape, Lambda, Dropout, Masking
 from keras.models import Input, Model
 from keras_contrib.layers import CRF
 from keras_contrib.losses import crf_loss
@@ -14,9 +14,11 @@ from data_management import file_utils
 
 def get_model(max_len_sentences, max_len_words, wv_size, config, tags, char_vocab=20, cnn_emb_size=10):
 
-    char_inputs = Input(shape=(max_len_sentences * max_len_words,), name="char_input")
+    # Batch size x max_len_sentence x max_words
+    char_inputs = Input(shape=(max_len_sentences, max_len_words,), name="char_input")
 
-    char_vec = Embedding(input_dim=char_vocab, output_dim=cnn_emb_size,)(char_inputs)
+    # Batch size x max_len_sentence x max_words x char_embedding
+    char_vec = Embedding(input_dim=char_vocab, output_dim=cnn_emb_size, mask_zero=0)(char_inputs)
 
     layers = []
 
@@ -27,55 +29,62 @@ def get_model(max_len_sentences, max_len_words, wv_size, config, tags, char_voca
 
     embed_size = sum(config['char_filters']) + wv_size
 
-    char_vec = Reshape((max_len_sentences * max_len_words, cnn_emb_size, 1))(char_vec)
-
+    # Batch size x max_len_sentence x max_words x char_embedding
     for i, f in enumerate(char_filters):
+        # Batch size x max_len_sentence x 1 x Features
         cnn_sub = Conv2D(filters=f, kernel_size=[char_kernels[i], cnn_emb_size],
-                                         padding='valid', activation='tanh')(char_vec)
-        cnn_sub = Lambda(lambda x: K.max(x, axis=1, keepdims=True))(cnn_sub)
-        cnn_sub = Reshape([-1, f])(cnn_sub)
-        cnn_sub = Dropout(rate=0.25)(cnn_sub)
+                                         padding='same', activation='tanh')(char_vec)
+        # Batch size x max_len_sentence x 1 x Pool Features
+        cnn_sub = Lambda(lambda x: K.max(x, axis=2, keepdims=True))(cnn_sub)
+
+        # Batch size x max_len_sentence x Pool Features
+        cnn_sub = Reshape([max_len_sentences, f])(cnn_sub)
+        cnn_sub = Dropout(rate=0.35)(cnn_sub)
         layers.append(cnn_sub)
 
+    # Batch size x max_len_sentence x all features
     cnn_out = Concatenate(axis=2)(layers)
 
+    # Batch size x max_sentence_x wv_embedding
     word_vec = Input(shape=(max_len_sentences, wv_size), name="w2v_input")
 
+    # Batch size x max_len_sentence x total_embed
     concatenated = Concatenate(axis=2)([word_vec, cnn_out])
-
-    concatenated = Reshape((max_len_sentences, embed_size, 1))(concatenated)
-
-
 
     layers = []
 
+    # Batch size x max_len_sentence x total embed x 1
+    concatenated = Reshape((max_len_sentences, embed_size, 1))(concatenated)
+
     for i, f in enumerate(word_filters):
-        cnn_sub = TimeDistributed(Conv1D(filters=f, kernel_size=[word_kernels[i]],
-                                         padding='valid', activation='tanh'),
-                                  input_shape=[max_len_sentences, embed_size, 1]
-                                  )(concatenated)
+        cnn_sub = Conv2D(filters=f, kernel_size=[word_kernels[i],embed_size],
+                                         padding='same', activation='tanh')(concatenated)
         cnn_sub = Lambda(lambda x: K.max(x, axis=2, keepdims=True))(cnn_sub)
         cnn_sub = Reshape([max_len_sentences, f])(cnn_sub)
-        cnn_sub = Dropout(rate=0.25)(cnn_sub)
+        cnn_sub = Dropout(rate=0.35)(cnn_sub)
         layers.append(cnn_sub)
 
     n_gram_out = Concatenate(axis=2)(layers)
 
+    n_gram_out = Masking(mask_value=0.0, input_shape=(max_len_sentences, embed_size))(n_gram_out)
+
+    # Batch size x max_sentence x total_embed
     pos_vec = Input(shape=(max_len_sentences, 1), name="pos_input")
 
+    # Batch size x max_sentence x total_embed + 1
     n_gram_out = Concatenate(axis=2)([pos_vec, n_gram_out])
 
     classes = len(tags)
 
-    crf = CRF(classes, sparse_target=True)
+    crf = CRF(classes, sparse_target=False)
 
     crf_out = crf(n_gram_out)
 
     model = Model(inputs=[char_inputs, word_vec, pos_vec], outputs=crf_out)
 
-    adam = optimizers.Adam(lr=0.002)
+    opt = optimizers.Adam()
 
-    model.compile(adam, loss=crf_loss, metrics=[crf_viterbi_accuracy])
+    model.compile(opt, loss=crf_loss, metrics=[crf_viterbi_accuracy])
 
     model.summary()
 
@@ -117,8 +126,8 @@ def main():
 
     char_vocab = len(char_dict) + 1
 
-    config = {'char_kernels': [1, 3, 5, 7, 10], 'char_filters': [200, 200, 150, 150, 100],
-              'word_kernels': [1, 3, 5, 7, 10], 'word_filters': [50, 50, 50, 50, 50]}
+    config = {'char_kernels': [1, 3, 5], 'char_filters': [200, 200, 200],
+              'word_kernels': [1, 3, 5], 'word_filters': [50, 50, 50]}
 
     print('Building Model')
     model = get_model(max_len_sentences, max_len_words, 200, config, test_tags, char_vocab)
@@ -131,7 +140,7 @@ def main():
                                                  save_best_only=False, mode='max')
 
     print('Training Model')
-    model.fit(x=[np.array(chars), np.array(training_vectorized), np.array(pos)], epochs=1000, batch_size=32, y=np.array(enc_tags),
+    model.fit(x=[np.array(chars), np.array(training_vectorized), np.array(pos)], epochs=1000, batch_size=16, y=np.array(enc_tags),
               validation_split=0.2, callbacks=[tensorboard, checkpoint], shuffle=True)
 
 

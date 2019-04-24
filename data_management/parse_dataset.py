@@ -148,6 +148,8 @@ def get_enc_tags(tokenized_tags, tags):
 
             enc = tags[tag]
 
+            onehot = [0.0 for i in tags]
+
             encoded.append([enc])
 
         sentences_enc.append(encoded)
